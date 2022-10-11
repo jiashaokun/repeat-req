@@ -150,6 +150,7 @@ func (r *RepeatReq) set() {
 // CrontabDo 定时任务启动函数
 func CrontabDo() {
 	// cache_key
+	fmt.Println("Crontab------------------------------")
 	now := time.Now().Format(cache.TimeFormat)
 	keyPrefix := fmt.Sprintf(cache.ListKey, now)
 	body, ok := cache.Cache.Get(keyPrefix)

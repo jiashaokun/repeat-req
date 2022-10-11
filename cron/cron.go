@@ -1,6 +1,7 @@
 package cron
 
 import (
+	"fmt"
 	"github.com/go-co-op/gocron"
 	"github.com/jiashaokun/repeat-req/service"
 	"time"
@@ -8,6 +9,8 @@ import (
 
 func Init() {
 	s := gocron.NewScheduler(time.UTC)
-	s.Cron("*/1 * * * *").Do(service.CrontabDo)
+	fmt.Println("Crontab--------------start----------------")
+	_, err := s.Cron("*/1 * * * *").Do(service.CrontabDo)
+	fmt.Println("Crontab-----err------", err)
 	s.StartAsync()
 }
