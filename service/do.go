@@ -47,6 +47,8 @@ func (r *RepeatReq) Set() error {
 // 计算下一次的参数
 func (r *RepeatReq) next() error {
 	//计算下一个时间的key
+	b, _ := json.Marshal(r)
+	fmt.Println("-----------------param b-------", string(b))
 	if r.Repeat.Num == 0 {
 		return nil
 	}
@@ -75,6 +77,9 @@ func (r *RepeatReq) nextParam() error {
 		next := now.Add(timeLang)
 		r.Repeat.NextTime = &next
 	}
+	c, _ := json.Marshal(r)
+	fmt.Println("-----------------param c-------", string(c))
+
 	r.set()
 	return nil
 }
