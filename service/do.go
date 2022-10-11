@@ -135,6 +135,9 @@ func (r *RepeatReq) set() {
 
 	body, _ := json.Marshal(r)
 
+	b, _ := json.Marshal(r)
+	fmt.Println("-----------------param b-------", string(b))
+
 	cache.Cache.Set(r.KeyHash, string(body), time.Duration(cache.TimeCache))
 
 	//增加下一个时段的队列 list key = 2022-01-01 01:01:01
@@ -151,6 +154,9 @@ func (r *RepeatReq) set() {
 	keyList = append(keyList, r.KeyHash)
 
 	nextListBody, _ := json.Marshal(keyList)
+
+	fmt.Println("-----------next---list----key", nextListKey)
+
 	cache.Cache.Set(nextListKey, string(nextListBody), time.Duration(cache.TimeCache))
 }
 
@@ -161,6 +167,7 @@ func CrontabDo() {
 	now := time.Now().Format(cache.TimeFormat)
 	keyPrefix := fmt.Sprintf(cache.ListKey, now)
 	body, ok := cache.Cache.Get(keyPrefix)
+	fmt.Println("----------key-----time---", keyPrefix)
 	fmt.Println("------------------ok------------", ok)
 	if !ok {
 		return
