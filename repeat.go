@@ -3,6 +3,7 @@ package repeat_req
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/jiashaokun/repeat-req/cache"
 	"github.com/jiashaokun/repeat-req/cron"
 	"github.com/jiashaokun/repeat-req/service"
@@ -72,6 +73,7 @@ func (c *Repeat) Do() error {
 		Repeat: &repeat,
 	}
 	if err := info.Set(); err != nil {
+		fmt.Println("========", err)
 		return err
 	}
 	return nil
