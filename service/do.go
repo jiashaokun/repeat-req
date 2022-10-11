@@ -103,6 +103,7 @@ func (r *RepeatReq) request() bool {
 	}
 	var response string
 	request := gorequest.New()
+	fmt.Println("---------param url------", r.Param.Url)
 	switch method {
 	case "POST":
 		_, response, _ = request.Post(r.Param.Url).SendMap(param).End()
@@ -111,6 +112,7 @@ func (r *RepeatReq) request() bool {
 		_, response, _ = request.Get(r.Param.Url).SendMap(param).End()
 		break
 	}
+	fmt.Println("--------------resp--------", response)
 	if len(r.Param.RequestResponse.Response) > 0 {
 		paramResp := r.Param.RequestResponse.Response
 		if md5.Sum([]byte(response)) == md5.Sum([]byte(paramResp)) {
@@ -154,6 +156,7 @@ func CrontabDo() {
 	now := time.Now().Format(cache.TimeFormat)
 	keyPrefix := fmt.Sprintf(cache.ListKey, now)
 	body, ok := cache.Cache.Get(keyPrefix)
+	fmt.Println("------------------ok------------", ok)
 	if !ok {
 		return
 	}
@@ -164,19 +167,24 @@ func CrontabDo() {
 	}
 
 	if len(keyList) <= 0 {
+		fmt.Println("============len key list========", len(keyList))
 		return
 	}
 
 	// 获取数据
+	fmt.Println("---------Key----list----", keyList)
 	go func(keyList []string) {
 		for _, v := range keyList {
 			infoBody, ek := cache.Cache.Get(v)
 			if !ek {
+				fmt.Println("-----------------body status---------", ek)
 				continue
 			}
 			infoStr := infoBody.(string)
+			fmt.Println("-----------body str----------", infoStr)
 			req := RepeatReq{}
 			if reqErr := json.Unmarshal([]byte(infoStr), &req); reqErr != nil {
+				fmt.Println("------------json error---------", reqErr)
 				continue
 			}
 			req.do()
