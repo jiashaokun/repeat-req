@@ -30,3 +30,7 @@ func Get(key string) string {
 	}
 	return string(body)
 }
+
+func Delete(key string) {
+	Cache.Delete(key)
+}

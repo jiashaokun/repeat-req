@@ -55,29 +55,22 @@ func (r *RepeatReq) Set() error {
 	return nil
 }
 
-// 计算下一次的参数
-func (r *RepeatReq) next() error {
-	//计算下一个时间的key
-	b, _ := json.Marshal(r)
-	fmt.Println("-----------------param b-------", string(b))
-	if r.Repeat.Num == 0 {
-		return nil
-	}
-	//检查是否存在返回值效验
-	r.nextParam()
-	return nil
-}
-
-// 计算下一次的参数
+// 计算下一次的参数 -[1,3,5]
 func (r *RepeatReq) nextParam() error {
 	//检查是否存在返回值效验
 	r.Repeat.Num = r.Repeat.Num - 1
+	if r.Repeat.Num == 0 {
+		cache.Delete(r.KeyHash)
+		return nil
+	}
 	nextMinuteNum := 1
 	if len(r.Repeat.Interval) > 0 {
+		if len(r.Repeat.Interval) > 1 {
+			r.Repeat.Interval = r.Repeat.Interval[1:]
+		}
 		//计算第一个数据的值
 		nextMinuteNum = r.Repeat.Interval[0]
 	}
-	r.Repeat.Interval = r.Repeat.Interval[1:]
 	//下一次的时间
 	if r.Repeat.NextTime == nil {
 		timeLang := time.Minute * time.Duration(1)
@@ -89,38 +82,23 @@ func (r *RepeatReq) nextParam() error {
 		next := now.Add(timeLang)
 		r.Repeat.NextTime = &next
 	}
-	c, _ := json.Marshal(r)
-	fmt.Println("-----------------param c-------", string(c))
 
 	r.set()
 	return nil
 }
 
-// request do
-func (r *RepeatReq) do() error {
-	if r.Repeat.Num == 0 {
-		return nil
-	}
-	if ok := r.request(); ok {
-		return nil
-	}
-	r.nextParam()
-	return nil
-}
-
 // 返回值 true: 继续next 、false：停止next
-func (r *RepeatReq) request() bool {
+func (r *RepeatReq) request() {
 	//判断是否存在返回值
 	method := strings.ToUpper(r.Param.Method)
 	var param map[string]interface{}
 	if len(r.Param.Param) > 0 {
 		if err := json.Unmarshal([]byte(r.Param.Param), &param); err != nil {
-			return false
+			return
 		}
 	}
 	var response string
 	request := gorequest.New()
-	fmt.Println("---------param url------", r.Param.Url)
 	switch method {
 	case "POST":
 		_, response, _ = request.Post(r.Param.Url).SendMap(param).End()
@@ -129,14 +107,22 @@ func (r *RepeatReq) request() bool {
 		_, response, _ = request.Get(r.Param.Url).SendMap(param).End()
 		break
 	}
-	fmt.Println("--------------resp--------", response)
 	if len(r.Param.RequestResponse.Response) > 0 {
 		paramResp := r.Param.RequestResponse.Response
-		if md5.Sum([]byte(response)) == md5.Sum([]byte(paramResp)) {
-			return false
+		respByte := md5.Sum([]byte(response))
+		respStr := fmt.Sprintf("%x", respByte)
+		paramRespByte := md5.Sum([]byte(paramResp))
+		paramRespStr := fmt.Sprintf("%x", paramRespByte)
+
+		if respStr == paramRespStr {
+			r.Repeat.Num = 0
 		}
 	}
-	return true
+	if r.Repeat.Num == 0 {
+		return
+	}
+	r.nextParam()
+	return
 }
 
 //获取key
@@ -145,18 +131,9 @@ func (r *RepeatReq) set() {
 	hashKey := md5.Sum([]byte(cacheKey))
 
 	r.KeyHash = fmt.Sprintf("%x", hashKey)
-
-	fmt.Println("----------------", r.KeyHash)
-
 	body, _ := json.Marshal(r)
-
-	b, _ := json.Marshal(r)
-
-	fmt.Println("-----------------param b-------", string(b))
-
 	cache.Set(r.KeyHash, string(body))
 
-	fmt.Println("-----------------param bb-------")
 	//增加下一个时段的队列 list key = 2022-01-01 01:01:01
 	nextTime := *r.Repeat.NextTime
 	next := nextTime.Format(cache.TimeFormat)
@@ -167,29 +144,24 @@ func (r *RepeatReq) set() {
 	info := string(listBody)
 	json.Unmarshal([]byte(info), &keyList)
 
-	fmt.Println("-------------key----------", r.KeyHash)
-
 	keyList = append(keyList, r.KeyHash)
-
 	nextListBody, _ := json.Marshal(keyList)
-	fmt.Println("-----------set----next---list----key", nextListKey)
-	fmt.Println("--------set list key-------", string(nextListBody))
 
 	cache.Set(nextListKey, string(nextListBody))
-
-	data := cache.Get(nextListKey)
-	fmt.Println("----------eok-----", string(data))
 }
 
 // CrontabDo 定时任务启动函数
 func CrontabDo() {
+	// 删除上一分钟的list
+	upTime := time.Now().Add(-time.Minute).Format(cache.TimeFormat)
+	upPrefix := fmt.Sprintf(cache.ListKey, upTime)
+	go cache.Delete(upPrefix)
+
 	// cache_key
-	fmt.Println("Crontab------------------------------")
 	now := time.Now().Format(cache.TimeFormat)
 	keyPrefix := fmt.Sprintf(cache.ListKey, now)
 
 	data := cache.Get(keyPrefix)
-	fmt.Println("------get----key-----time---", keyPrefix)
 
 	var keyList []string
 	bodyStr := string(data)
@@ -198,23 +170,19 @@ func CrontabDo() {
 	}
 
 	if len(keyList) <= 0 {
-		fmt.Println("============len key list========", len(keyList))
 		return
 	}
 
 	// 获取数据
-	fmt.Println("---------Key----list----", keyList)
 	go func(keyList []string) {
 		for _, v := range keyList {
 			infoBody := cache.Get(v)
 			infoStr := string(infoBody)
-			fmt.Println("-----------body str----------", infoStr)
 			req := RepeatReq{}
 			if reqErr := json.Unmarshal([]byte(infoStr), &req); reqErr != nil {
-				fmt.Println("------------json error---------", reqErr)
 				continue
 			}
-			req.do()
+			req.request()
 		}
 	}(keyList)
 

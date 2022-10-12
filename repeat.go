@@ -2,8 +2,6 @@ package repeat_req
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"github.com/jiashaokun/repeat-req/cache"
 	"github.com/jiashaokun/repeat-req/cron"
 	"github.com/jiashaokun/repeat-req/service"
@@ -60,10 +58,6 @@ func (c *Repeat) Do() error {
 		param.Param = string(paramByte)
 	}
 
-	if len(c.Interval) > 0 && len(c.Interval) != c.Num {
-		return errors.New("参数 Interval 不为空时，该值必须等于 Num 的值")
-	}
-
 	repeat := service.Repeat{
 		Num:      c.Num,
 		Interval: c.Interval,
@@ -73,7 +67,6 @@ func (c *Repeat) Do() error {
 		Repeat: &repeat,
 	}
 	if err := info.Set(); err != nil {
-		fmt.Println("========", err)
 		return err
 	}
 	return nil
