@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"github.com/golang/groupcache"
 	"github.com/jiashaokun/repeat-req/cache"
 	"github.com/parnurzeal/gorequest"
 	"strings"
@@ -41,7 +40,18 @@ type RequestResponse struct {
 
 // Set 写入
 func (r *RepeatReq) Set() error {
-	r.next()
+	nextMinuteNum := 1
+	if len(r.Repeat.Interval) > 0 {
+		//计算第一个数据的值
+		nextMinuteNum = r.Repeat.Interval[0]
+	}
+
+	timeLang := time.Minute * time.Duration(nextMinuteNum)
+	next := time.Now().Add(timeLang)
+	r.Repeat.NextTime = &next
+
+	r.set()
+
 	return nil
 }
 
@@ -144,21 +154,18 @@ func (r *RepeatReq) set() {
 
 	fmt.Println("-----------------param b-------", string(b))
 
-	cache.Cache.Set(r.KeyHash, string(body))
+	cache.Set(r.KeyHash, string(body))
 
+	fmt.Println("-----------------param bb-------")
 	//增加下一个时段的队列 list key = 2022-01-01 01:01:01
 	nextTime := *r.Repeat.NextTime
 	next := nextTime.Format(cache.TimeFormat)
 	nextListKey := fmt.Sprintf(cache.ListKey, next)
 
-	var listBody []byte
-	err := cache.Group.Get(nil, nextListKey, groupcache.AllocatingByteSliceSink(&listBody))
-	//listBody, ok := cache.Cache.Get(nextListKey)
+	listBody := cache.Get(nextListKey)
 	var keyList []string
-	if err == nil {
-		info := string(listBody)
-		json.Unmarshal([]byte(info), &keyList)
-	}
+	info := string(listBody)
+	json.Unmarshal([]byte(info), &keyList)
 
 	fmt.Println("-------------key----------", r.KeyHash)
 
@@ -168,13 +175,9 @@ func (r *RepeatReq) set() {
 	fmt.Println("-----------set----next---list----key", nextListKey)
 	fmt.Println("--------set list key-------", string(nextListBody))
 
-	cache.Cache.Set(nextListKey, string(nextListBody))
+	cache.Set(nextListKey, string(nextListBody))
 
-	var data []byte
-	err = cache.Group.Get(nil, nextListKey, groupcache.AllocatingByteSliceSink(&data))
-	if err != nil {
-		fmt.Println("========err=========", err)
-	}
+	data := cache.Get(nextListKey)
 	fmt.Println("----------eok-----", string(data))
 }
 
@@ -185,12 +188,9 @@ func CrontabDo() {
 	now := time.Now().Format(cache.TimeFormat)
 	keyPrefix := fmt.Sprintf(cache.ListKey, now)
 
-	var data []byte
-	err := cache.Group.Get(nil, keyPrefix, groupcache.AllocatingByteSliceSink(&data))
+	data := cache.Get(keyPrefix)
 	fmt.Println("------get----key-----time---", keyPrefix)
-	if err != nil {
-		return
-	}
+
 	var keyList []string
 	bodyStr := string(data)
 	if err := json.Unmarshal([]byte(bodyStr), &keyList); err != nil {
@@ -206,12 +206,7 @@ func CrontabDo() {
 	fmt.Println("---------Key----list----", keyList)
 	go func(keyList []string) {
 		for _, v := range keyList {
-			var infoBody []byte
-			err = cache.Group.Get(nil, v, groupcache.AllocatingByteSliceSink(&infoBody))
-			if err != nil {
-				fmt.Println("-----------------body status---------", err)
-				continue
-			}
+			infoBody := cache.Get(v)
 			infoStr := string(infoBody)
 			fmt.Println("-----------body str----------", infoStr)
 			req := RepeatReq{}
