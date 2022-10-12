@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"github.com/golang/groupcache"
 	"github.com/jiashaokun/repeat-req/cache"
 	"github.com/parnurzeal/gorequest"
 	"strings"
@@ -69,7 +70,8 @@ func (r *RepeatReq) nextParam() error {
 	r.Repeat.Interval = r.Repeat.Interval[1:]
 	//下一次的时间
 	if r.Repeat.NextTime == nil {
-		now := time.Now()
+		timeLang := time.Minute * time.Duration(1)
+		now := time.Now().Add(timeLang)
 		r.Repeat.NextTime = &now
 	} else {
 		now := *r.Repeat.NextTime
@@ -131,33 +133,49 @@ func (r *RepeatReq) request() bool {
 func (r *RepeatReq) set() {
 	cacheKey := fmt.Sprintf("%s%s_%s", cache.BaseCacheExp, r.Param.Url, r.Param.Param)
 	hashKey := md5.Sum([]byte(cacheKey))
-	r.KeyHash = string(hashKey[:])
+
+	r.KeyHash = fmt.Sprintf("%x", hashKey)
+
+	fmt.Println("----------------", r.KeyHash)
 
 	body, _ := json.Marshal(r)
 
 	b, _ := json.Marshal(r)
+
 	fmt.Println("-----------------param b-------", string(b))
 
-	cache.Cache.Set(r.KeyHash, string(body), time.Duration(cache.TimeCache))
+	cache.Cache.Set(r.KeyHash, string(body))
 
 	//增加下一个时段的队列 list key = 2022-01-01 01:01:01
 	nextTime := *r.Repeat.NextTime
 	next := nextTime.Format(cache.TimeFormat)
 	nextListKey := fmt.Sprintf(cache.ListKey, next)
 
-	listBody, ok := cache.Cache.Get(nextListKey)
+	var listBody []byte
+	err := cache.Group.Get(nil, nextListKey, groupcache.AllocatingByteSliceSink(&listBody))
+	//listBody, ok := cache.Cache.Get(nextListKey)
 	var keyList []string
-	if ok {
-		info := listBody.(string)
+	if err == nil {
+		info := string(listBody)
 		json.Unmarshal([]byte(info), &keyList)
 	}
+
+	fmt.Println("-------------key----------", r.KeyHash)
+
 	keyList = append(keyList, r.KeyHash)
 
 	nextListBody, _ := json.Marshal(keyList)
+	fmt.Println("-----------set----next---list----key", nextListKey)
+	fmt.Println("--------set list key-------", string(nextListBody))
 
-	fmt.Println("-----------next---list----key", nextListKey)
+	cache.Cache.Set(nextListKey, string(nextListBody))
 
-	cache.Cache.Set(nextListKey, string(nextListBody), time.Duration(cache.TimeCache))
+	var data []byte
+	err = cache.Group.Get(nil, nextListKey, groupcache.AllocatingByteSliceSink(&data))
+	if err != nil {
+		fmt.Println("========err=========", err)
+	}
+	fmt.Println("----------eok-----", string(data))
 }
 
 // CrontabDo 定时任务启动函数
@@ -166,14 +184,15 @@ func CrontabDo() {
 	fmt.Println("Crontab------------------------------")
 	now := time.Now().Format(cache.TimeFormat)
 	keyPrefix := fmt.Sprintf(cache.ListKey, now)
-	body, ok := cache.Cache.Get(keyPrefix)
-	fmt.Println("----------key-----time---", keyPrefix)
-	fmt.Println("------------------ok------------", ok)
-	if !ok {
+
+	var data []byte
+	err := cache.Group.Get(nil, keyPrefix, groupcache.AllocatingByteSliceSink(&data))
+	fmt.Println("------get----key-----time---", keyPrefix)
+	if err != nil {
 		return
 	}
 	var keyList []string
-	bodyStr := body.(string)
+	bodyStr := string(data)
 	if err := json.Unmarshal([]byte(bodyStr), &keyList); err != nil {
 		return
 	}
@@ -187,12 +206,13 @@ func CrontabDo() {
 	fmt.Println("---------Key----list----", keyList)
 	go func(keyList []string) {
 		for _, v := range keyList {
-			infoBody, ek := cache.Cache.Get(v)
-			if !ek {
-				fmt.Println("-----------------body status---------", ek)
+			var infoBody []byte
+			err = cache.Group.Get(nil, v, groupcache.AllocatingByteSliceSink(&infoBody))
+			if err != nil {
+				fmt.Println("-----------------body status---------", err)
 				continue
 			}
-			infoStr := infoBody.(string)
+			infoStr := string(infoBody)
 			fmt.Println("-----------body str----------", infoStr)
 			req := RepeatReq{}
 			if reqErr := json.Unmarshal([]byte(infoStr), &req); reqErr != nil {
