@@ -8,6 +8,12 @@
 2. 支持重复发送请求间隔时间（分钟）
 3. 支持匹配返回值，匹配成功后不再发送
 
+## 使用
+```sh
+go get -u github.com/jiashaokun/repeat-req
+```
+
+
 ### Demo
 ```go
 //使用gin框架举例
