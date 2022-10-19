@@ -91,20 +91,14 @@ func (r *RepeatReq) nextParam() error {
 func (r *RepeatReq) request() {
 	//判断是否存在返回值
 	method := strings.ToUpper(r.Param.Method)
-	var param map[string]interface{}
-	if len(r.Param.Param) > 0 {
-		if err := json.Unmarshal([]byte(r.Param.Param), &param); err != nil {
-			return
-		}
-	}
 	var response string
 	request := gorequest.New()
 	switch method {
 	case "POST":
-		_, response, _ = request.Post(r.Param.Url).SendMap(param).End()
+		_, response, _ = request.Post(r.Param.Url).Type("multipart").Send(r.Param.Param).End()
 		break
 	case "GET":
-		_, response, _ = request.Get(r.Param.Url).SendMap(param).End()
+		_, response, _ = request.Get(r.Param.Url).Type("multipart").Send(r.Param.Param).End()
 		break
 	}
 	if len(r.Param.RequestResponse.Response) > 0 {

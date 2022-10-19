@@ -19,27 +19,12 @@ func Init() {
 // Repeat Num 请求次数
 // Repeat Interval 选填（不填默认分发间隔时间 1 分钟） 间隔时间，单位：分钟,间隔时间的元素个数必须等于字段 Num 的值；举例：[1,2,3]，第一次是 1 分钟后开始请求，第二次是当第一次请求完毕后间隔的时间也就是如果第一次请求失败，与第一次间隔 2 分钟后会请求第二次，以此类推，第二次若请求失败，与第二次间隔 3 分钟后请求第三次
 type Repeat struct {
-	Url      string  `json:"url"`
-	Param    []Param `json:"param"`
-	Method   string  `json:"method"`
-	Response string  `json:"response"`
-	Num      int     `json:"num"`
-	Interval []int   `json:"interval"`
-}
-
-type Param struct {
-	Key   string      `json:"key"`
-	Value interface{} `json:"value"`
-}
-
-func (c *Repeat) SetParam(param map[string]interface{}) {
-	for k, v := range param {
-		info := Param{
-			Key:   k,
-			Value: v,
-		}
-		c.Param = append(c.Param, info)
-	}
+	Url      string                 `json:"url"`
+	Param    map[string]interface{} `json:"param"`
+	Method   string                 `json:"method"`
+	Response string                 `json:"response"`
+	Num      int                    `json:"num"`
+	Interval []int                  `json:"interval"`
 }
 
 func (c *Repeat) Do() error {
