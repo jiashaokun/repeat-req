@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/jiashaokun/repeat-req/cache"
 	"github.com/parnurzeal/gorequest"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -98,7 +99,19 @@ func (r *RepeatReq) request() {
 		_, response, _ = request.Post(r.Param.Url).Type("multipart").Send(r.Param.Param).End()
 		break
 	case "GET":
-		_, response, _ = request.Get(r.Param.Url).Type("multipart").Send(r.Param.Param).End()
+		requestUrl := r.Param.Url
+		param := make(map[string]interface{})
+		if len(r.Param.Param) > 0 {
+			json.Unmarshal([]byte(r.Param.Param), &param)
+			urlP := url.Values{}
+			for k, v := range param {
+				urlP.Set(k, fmt.Sprintf("%v", v))
+			}
+			paramUrl := urlP.Encode()
+			requestUrl = fmt.Sprintf("%s?%s", r.Param.Url, paramUrl)
+		}
+
+		_, response, _ = request.Get(requestUrl).End()
 		break
 	}
 	if len(r.Param.RequestResponse.Response) > 0 {
