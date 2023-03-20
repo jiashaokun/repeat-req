@@ -24,10 +24,7 @@ type UrlParam struct {
 	RequestResponse *RequestResponse `json:"request_response"`
 }
 
-// Repeat Num 剩余次数
-// Interval 剩余间隔
-// NextTime 下一次请求的时间
-// NextKey  下一次请求的key
+// Repeat Num 剩余次数 Interval 剩余间隔  NextTime 下一次请求的时间 NextKey  下一次请求的key
 type Repeat struct {
 	Num      int        `json:"num"`
 	Interval []int      `json:"interval"`
